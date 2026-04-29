@@ -44,7 +44,7 @@ export function createSupportStructure(trackData) {
     const sample = trackData.samples[index * SUPPORT_SPACING];
 
     helperStart.set(sample.point.x, GROUND_LEVEL, sample.point.z);
-    helperEnd.copy(sample.point).addScaledVector(sample.normal, -0.2);
+    helperEnd.copy(sample.point).addScaledVector(sample.up, -0.2);
     placeCylinder(pillars, index, helperStart, helperEnd, 1);
 
     if (index < supportCount - 1) {
@@ -53,7 +53,7 @@ export function createSupportStructure(trackData) {
         braces,
         braceIndex,
         helperStart,
-        nextSample.point.clone().addScaledVector(nextSample.normal, -0.2),
+        nextSample.point.clone().addScaledVector(nextSample.up, -0.2),
         1
       );
       braceIndex += 1;

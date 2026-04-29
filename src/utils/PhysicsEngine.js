@@ -7,7 +7,14 @@ import { getTrackSampleAtDistance } from './TrackGenerator';
 const gravityVector = new THREE.Vector3(0, -GRAVITY, 0);
 
 class PhysicsEngine {
-  constructor({ trackData, initialSpeedKmh = 72, friction = 0.016 }) {
+  constructor({
+    trackData,
+    initialSpeedKmh = 72,
+    friction = 0.016,
+    rollingResistance = 0.0008,
+    minimumSpeedKmh = 35,
+    boosterStrength = 2.4
+  }) {
     this.world = new World({
       gravity: new Vec3(0, -GRAVITY, 0)
     });
@@ -15,6 +22,9 @@ class PhysicsEngine {
     this.initialSpeedMs = kmhToMs(initialSpeedKmh);
     this.speedLimitMs = kmhToMs(200);
     this.friction = friction;
+    this.rollingResistance = rollingResistance;
+    this.minimumSpeedMs = kmhToMs(minimumSpeedKmh);
+    this.boosterStrength = boosterStrength;
     this.reset(initialSpeedKmh);
   }
 
@@ -37,15 +47,38 @@ class PhysicsEngine {
     this.speedLimitMs = kmhToMs(speedLimitKmh);
   }
 
-  calculateSpeed(currentHeight, previousHeight, speedMs, friction, tangentY, deltaTime) {
-    const slopeAcceleration = -this.world.gravity.y * -tangentY;
-    const potentialBoost = (previousHeight - currentHeight) * 0.65;
-    const frictionAcceleration = this.applyFriction(speedMs, friction);
-    const nextSpeed =
-      speedMs +
-      (slopeAcceleration + potentialBoost - frictionAcceleration) * deltaTime;
+  getTrackGradient(tangent) {
+    return Math.asin(clamp(tangent.y, -1, 1));
+  }
 
-    return clamp(nextSpeed, 0, this.speedLimitMs);
+  calculateSpeed(currentHeight, previousHeight, speedMs, trackGradient, deltaTime) {
+    const slopeAcceleration = -this.world.gravity.y * -Math.sin(trackGradient);
+    const heightDifference = previousHeight - currentHeight;
+    const momentumAssist = clamp(heightDifference * 0.9, -8, 8);
+    const frictionAcceleration = this.applyFriction(speedMs, this.friction);
+
+    let boosterAcceleration = 0;
+
+    if (trackGradient > 0.16 && speedMs < this.minimumSpeedMs + 6) {
+      boosterAcceleration =
+        this.boosterStrength * (1 + Math.max(trackGradient - 0.16, 0) * 1.8);
+    }
+
+    const totalAcceleration =
+      slopeAcceleration + momentumAssist + boosterAcceleration - frictionAcceleration;
+    const climbingFloor = trackGradient > 0.12 ? this.minimumSpeedMs : 0;
+    const nextSpeed = clamp(
+      speedMs + totalAcceleration * deltaTime,
+      climbingFloor,
+      this.speedLimitMs
+    );
+
+    return {
+      speedMs: nextSpeed,
+      acceleration: totalAcceleration,
+      boosterActive: boosterAcceleration > 0,
+      gradientDeg: THREE.MathUtils.radToDeg(trackGradient)
+    };
   }
 
   calculateGForce(accelerationVector) {
@@ -62,20 +95,21 @@ class PhysicsEngine {
   }
 
   applyFriction(velocity, friction = this.friction) {
-    return friction * GRAVITY + velocity * velocity * 0.0016;
+    return friction * velocity + this.rollingResistance * velocity * velocity;
   }
 
   update(deltaTime) {
     const currentSample = getTrackSampleAtDistance(this.trackData, this.distance);
     const previousSpeedMs = this.speedMs;
-    const nextSpeedMs = this.calculateSpeed(
+    const trackGradient = this.getTrackGradient(currentSample.tangent);
+    const speedResult = this.calculateSpeed(
       currentSample.point.y,
       this.previousHeight,
       previousSpeedMs,
-      this.friction,
-      currentSample.tangent.y,
+      trackGradient,
       deltaTime
     );
+    const nextSpeedMs = speedResult.speedMs;
 
     const distanceStep = ((previousSpeedMs + nextSpeedMs) * 0.5) * deltaTime;
     this.cumulativeDistance += distanceStep;
@@ -83,8 +117,7 @@ class PhysicsEngine {
     this.elapsedTime += deltaTime;
 
     const updatedSample = getTrackSampleAtDistance(this.trackData, this.distance);
-    const tangentialAcceleration =
-      (nextSpeedMs - previousSpeedMs) / Math.max(deltaTime, 0.0001);
+    const tangentialAcceleration = speedResult.acceleration;
     const centripetalAcceleration =
       nextSpeedMs * nextSpeedMs * updatedSample.curvature;
 
@@ -109,6 +142,8 @@ class PhysicsEngine {
       speedKmh: msToKmh(this.speedMs),
       height: updatedSample.point.y,
       gForce,
+      gradientDeg: speedResult.gradientDeg,
+      boosterActive: speedResult.boosterActive,
       point: updatedSample.point,
       tangent: updatedSample.tangent,
       collision: this.checkCollision()
@@ -124,6 +159,10 @@ class PhysicsEngine {
       speedKmh: msToKmh(this.speedMs),
       height: this.latestSample.point.y,
       gForce: 1,
+      gradientDeg: THREE.MathUtils.radToDeg(
+        this.getTrackGradient(this.latestSample.tangent)
+      ),
+      boosterActive: false,
       point: this.latestSample.point,
       tangent: this.latestSample.tangent,
       collision: false

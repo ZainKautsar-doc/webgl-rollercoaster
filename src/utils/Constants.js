@@ -137,7 +137,10 @@ export const PREDEFINED_TRACKS = [
     focus: 'Smooth banking with a single loop-like spiral segment.',
     color: '#eb5f49',
     friction: 0.018,
+    rollingResistance: 0.0009,
     suggestedSpeedKmh: 86,
+    minimumSpeedKmh: 34,
+    boosterStrength: 2.1,
     controlPoints: beginnerLoop
   },
   {
@@ -148,7 +151,10 @@ export const PREDEFINED_TRACKS = [
     focus: 'Double inversion segment with sharper curvature and faster drops.',
     color: '#4ec4ff',
     friction: 0.015,
+    rollingResistance: 0.00072,
     suggestedSpeedKmh: 132,
+    minimumSpeedKmh: 42,
+    boosterStrength: 2.6,
     controlPoints: corkscrewExtreme
   },
   {
@@ -159,7 +165,10 @@ export const PREDEFINED_TRACKS = [
     focus: 'Extended pacing with multiple height-driven energy changes.',
     color: '#5edb8f',
     friction: 0.013,
+    rollingResistance: 0.00055,
     suggestedSpeedKmh: 154,
+    minimumSpeedKmh: 48,
+    boosterStrength: 3,
     controlPoints: hypercoaster
   }
 ];

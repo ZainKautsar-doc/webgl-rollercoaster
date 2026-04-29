@@ -1,17 +1,71 @@
 import * as THREE from 'three';
 import { GROUND_LEVEL } from '../utils/Constants';
 
-export function createEnvironment() {
+const TERRAIN_RADIUS = 28;
+const TRACK_CLEARANCE = 4.4;
+
+export function createEnvironment(trackData) {
   const group = new THREE.Group();
   group.name = 'Environment';
 
+  const heightSampler = createTerrainHeightSampler(trackData);
   const sky = createSkyDome();
-  const ground = createGroundPlane();
+  const ground = createGroundPlane(heightSampler);
   const skyline = createSkylineRings();
 
+  group.userData.getHeightAt = heightSampler;
   group.add(sky, ground, skyline);
 
   return group;
+}
+
+function createTerrainHeightSampler(trackData) {
+  const sampledTrackPoints = trackData
+    ? trackData.samples.filter((_, index) => index % 6 === 0).map((sample) => ({
+      x: sample.point.x,
+      z: sample.point.z,
+      y: sample.point.y
+    }))
+    : [];
+
+  return (x, z) => {
+    const baseHeight =
+      Math.sin(x * 0.011) * 5.6 +
+      Math.cos(z * 0.009) * 4.2 +
+      Math.sin((x + z) * 0.0065) * 3 +
+      GROUND_LEVEL;
+
+    if (sampledTrackPoints.length === 0) {
+      return baseHeight;
+    }
+
+    let closestDistanceSq = Number.POSITIVE_INFINITY;
+    let closestTrackY = GROUND_LEVEL + 12;
+
+    sampledTrackPoints.forEach((sample) => {
+      const deltaX = x - sample.x;
+      const deltaZ = z - sample.z;
+      const distanceSq = deltaX * deltaX + deltaZ * deltaZ;
+
+      if (distanceSq < closestDistanceSq) {
+        closestDistanceSq = distanceSq;
+        closestTrackY = sample.y;
+      }
+    });
+
+    if (closestDistanceSq > TERRAIN_RADIUS * TERRAIN_RADIUS) {
+      return baseHeight;
+    }
+
+    const distance = Math.sqrt(closestDistanceSq);
+    const influence = 1 - distance / TERRAIN_RADIUS;
+    const sculptedTrackFloor =
+      closestTrackY -
+      TRACK_CLEARANCE -
+      influence * 2.8;
+
+    return Math.min(baseHeight, sculptedTrackFloor);
+  };
 }
 
 function createSkyDome() {
@@ -50,18 +104,14 @@ function createSkyDome() {
   return new THREE.Mesh(geometry, material);
 }
 
-function createGroundPlane() {
+function createGroundPlane(heightSampler) {
   const geometry = new THREE.PlaneGeometry(1800, 1800, 140, 140);
   const position = geometry.attributes.position;
 
   for (let index = 0; index < position.count; index += 1) {
     const x = position.getX(index);
-    const y = position.getY(index);
-    const wave =
-      Math.sin(x * 0.011) * 5.6 +
-      Math.cos(y * 0.009) * 4.2 +
-      Math.sin((x + y) * 0.0065) * 3;
-    position.setZ(index, wave + GROUND_LEVEL);
+    const z = position.getY(index);
+    position.setZ(index, heightSampler(x, z));
   }
 
   geometry.computeVertexNormals();

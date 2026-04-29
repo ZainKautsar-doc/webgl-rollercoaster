@@ -1,15 +1,17 @@
 import { useEffect } from 'react';
-import * as THREE from 'three';
 import setupScene from '../scenes/setupScene';
 import setupCamera from '../scenes/setupCamera';
 import setupLights from '../scenes/setupLights';
 import setupRenderer from '../scenes/setupRenderer';
-import { createRollerCoasterTrack, createCartMesh } from '../objects/RollerCoasterTrack';
+import { createRollerCoasterTrack } from '../objects/RollerCoasterTrack';
 import { createSupportStructure } from '../objects/Support';
 import { createEnvironment } from '../objects/Environment';
+import TrainComposition from '../objects/TrainComposition';
 import CameraController from '../utils/CameraController';
+import FreeCameraController from '../utils/FreeCameraController';
 import PhysicsEngine from '../utils/PhysicsEngine';
 import { buildTrackData } from '../utils/TrackGenerator';
+import { validateTrackContinuity } from '../utils/TrackValidator';
 import {
   FPS_SMOOTHING,
   HUD_REFRESH_MS,
@@ -60,33 +62,53 @@ function Scene({ mountRef }) {
     const scene = setupScene();
     const camera = setupCamera(mountNode);
     const lightRig = setupLights(scene);
-    const environment = createEnvironment();
-
-    scene.add(environment);
 
     const trackConfig = getTrackById(selectedTrackId);
     const trackData = buildTrackData(trackConfig);
+    const continuity = validateTrackContinuity(trackData.curve);
+    const environment = createEnvironment(trackData);
     const trackGroup = createRollerCoasterTrack(trackData, trackConfig);
     const supportGroup = createSupportStructure(trackData, trackConfig);
-    const cartMesh = createCartMesh(trackConfig.color);
+    const train = new TrainComposition({
+      color: trackConfig.color
+    });
 
+    scene.add(environment);
     scene.add(trackGroup);
     scene.add(supportGroup);
-    scene.add(cartMesh);
+    scene.add(train.getMesh());
 
     const cameraController = new CameraController(camera, trackData, {
-      viewMode: useSimulationStore.getState().viewMode
+      viewMode: useSimulationStore.getState().viewMode,
+      trainCarCount: train.carCount,
+      trainCarSpacing: train.carSpacing
+    });
+    const freeCameraController = new FreeCameraController(camera, renderer.domElement, {
+      moveSpeed: useSimulationStore.getState().freeCameraSpeed,
+      sensitivity: useSimulationStore.getState().freeCameraMouseSensitivity,
+      minimumHeight: 2,
+      minimumClearance: 1.8,
+      getHeightAt: environment.userData.getHeightAt,
+      onSpeedChange: (speed) =>
+        useSimulationStore.getState().setFreeCameraSpeed(speed)
     });
 
     const physicsEngine = new PhysicsEngine({
       trackData,
       initialSpeedKmh: trackConfig.suggestedSpeedKmh,
-      friction: trackConfig.friction
+      friction: trackConfig.friction,
+      rollingResistance: trackConfig.rollingResistance,
+      minimumSpeedKmh: trackConfig.minimumSpeedKmh,
+      boosterStrength: trackConfig.boosterStrength
     });
 
     physicsEngine.setSpeedLimitKmh(useSimulationStore.getState().speedLimitKmh);
     const initialSnapshot = physicsEngine.getSnapshot();
-    cameraController.updatePosition(initialSnapshot.distance, cartMesh);
+    cameraController.updatePosition(initialSnapshot.distance, train);
+
+    if (useSimulationStore.getState().viewMode === 'freeCamera') {
+      freeCameraController.reset();
+    }
 
     setTrackMeta(trackData.length, trackData.sampleCount);
     updateMetrics({
@@ -95,9 +117,15 @@ function Scene({ mountRef }) {
       gForce: initialSnapshot.gForce,
       distance: initialSnapshot.cumulativeDistance,
       elapsedTime: initialSnapshot.elapsedTime,
-      maxHeight: trackData.maxHeight
+      maxHeight: trackData.maxHeight,
+      gradientDeg: initialSnapshot.gradientDeg,
+      boosterActive: initialSnapshot.boosterActive,
+      loopProgress: (initialSnapshot.distance / trackData.length) * 100,
+      loopReady: continuity.isContinuous,
+      continuityGap: continuity.continuityGap,
+      tangentAlignment: continuity.tangentAlignment
     });
-    setStatus('Ready to ride');
+    setStatus(continuity.isContinuous ? 'Ready to ride' : 'Loop continuity warning');
 
     let rafId = 0;
     let previousTime = performance.now();
@@ -124,12 +152,29 @@ function Scene({ mountRef }) {
       const currentState = useSimulationStore.getState();
       cameraController.setViewMode(currentState.viewMode);
       physicsEngine.setSpeedLimitKmh(currentState.speedLimitKmh);
+      freeCameraController.setMoveSpeed(currentState.freeCameraSpeed);
+      freeCameraController.setMouseSensitivity(
+        currentState.freeCameraMouseSensitivity
+      );
 
       if (currentState.isPlaying) {
         currentSnapshot = physicsEngine.update(deltaTime);
       }
 
-      cameraController.updatePosition(currentSnapshot.distance, cartMesh);
+      if (currentState.viewMode === 'freeCamera') {
+        if (!freeCameraController.enabled) {
+          freeCameraController.enable();
+        }
+
+        cameraController.updateTrainPosition(currentSnapshot.distance, train);
+        freeCameraController.update(deltaTime);
+      } else {
+        if (freeCameraController.enabled) {
+          freeCameraController.disable();
+        }
+
+        cameraController.updatePosition(currentSnapshot.distance, train);
+      }
 
       smoothedFps =
         smoothedFps * (1 - FPS_SMOOTHING) +
@@ -142,7 +187,13 @@ function Scene({ mountRef }) {
           gForce: currentSnapshot.gForce,
           distance: currentSnapshot.cumulativeDistance,
           elapsedTime: currentSnapshot.elapsedTime,
-          maxHeight: trackData.maxHeight
+          maxHeight: trackData.maxHeight,
+          gradientDeg: currentSnapshot.gradientDeg,
+          boosterActive: currentSnapshot.boosterActive,
+          loopProgress: (currentSnapshot.distance / trackData.length) * 100,
+          loopReady: continuity.isContinuous,
+          continuityGap: continuity.continuityGap,
+          tangentAlignment: continuity.tangentAlignment
         });
         lastHudUpdate = now;
       }
@@ -168,11 +219,13 @@ function Scene({ mountRef }) {
       environment.removeFromParent();
       trackGroup.removeFromParent();
       supportGroup.removeFromParent();
-      cartMesh.removeFromParent();
+      train.getMesh().removeFromParent();
+      freeCameraController.disable();
+      freeCameraController.dispose();
       disposeSceneBranch(environment);
       disposeSceneBranch(trackGroup);
       disposeSceneBranch(supportGroup);
-      disposeSceneBranch(cartMesh);
+      disposeSceneBranch(train.getMesh());
 
       if (mountNode.contains(renderer.domElement)) {
         mountNode.removeChild(renderer.domElement);

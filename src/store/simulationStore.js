@@ -9,13 +9,22 @@ const createMetrics = (track = defaultTrack) => ({
   gForce: 1,
   distance: 0,
   elapsedTime: 0,
-  maxHeight: track.controlPoints[0].y
+  maxHeight: track.controlPoints[0].y,
+  gradientDeg: 0,
+  boosterActive: false,
+  loopProgress: 0,
+  loopReady: true,
+  continuityGap: 0,
+  tangentAlignment: 1
 });
 
 export const useSimulationStore = create((set, get) => ({
   isPlaying: true,
   speedLimitKmh: defaultTrack.suggestedSpeedKmh,
   viewMode: 'firstPerson',
+  freeCameraSpeed: 40,
+  freeCameraMouseSensitivity: 0.003,
+  freeCameraSprintEnabled: true,
   selectedTrackId: defaultTrack.id,
   metrics: createMetrics(defaultTrack),
   fps: 60,
@@ -32,6 +41,18 @@ export const useSimulationStore = create((set, get) => ({
     set({
       speedLimitKmh
     }),
+  setFreeCameraSpeed: (freeCameraSpeed) =>
+    set({
+      freeCameraSpeed
+    }),
+  setFreeCameraMouseSensitivity: (freeCameraMouseSensitivity) =>
+    set({
+      freeCameraMouseSensitivity
+    }),
+  setFreeCameraSprintEnabled: (freeCameraSprintEnabled) =>
+    set({
+      freeCameraSprintEnabled
+    }),
   setViewMode: (viewMode) => set({ viewMode }),
   setTrack: (selectedTrackId) => {
     const track =
@@ -44,7 +65,8 @@ export const useSimulationStore = create((set, get) => ({
       metrics: createMetrics(track),
       status: `Loading ${track.name}...`,
       simulationKey: state.simulationKey + 1,
-      isPlaying: true
+      isPlaying: true,
+      viewMode: state.viewMode
     }));
   },
   resetSimulation: () => {
@@ -57,7 +79,8 @@ export const useSimulationStore = create((set, get) => ({
       metrics: createMetrics(selectedTrack),
       status: `Resetting ${selectedTrack.name}...`,
       simulationKey: state.simulationKey + 1,
-      isPlaying: true
+      isPlaying: true,
+      viewMode: state.viewMode
     }));
   },
   updateMetrics: (metrics) =>

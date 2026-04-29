@@ -6,6 +6,15 @@ function Stats() {
   const trackLength = useSimulationStore((state) => state.trackLength);
   const sampleCount = useSimulationStore((state) => state.sampleCount);
   const status = useSimulationStore((state) => state.status);
+  const viewMode = useSimulationStore((state) => state.viewMode);
+  const metrics = useSimulationStore((state) => state.metrics);
+
+  const performanceClass =
+    fps >= 55
+      ? 'stats-chip performance-good'
+      : fps >= 40
+        ? 'stats-chip performance-warning'
+        : 'stats-chip performance-danger';
 
   return (
     <section className="hud-card">
@@ -16,7 +25,7 @@ function Stats() {
         </div>
 
         <div className="stats-grid">
-          <article className="stats-chip">
+          <article className={performanceClass}>
             <strong>{formatNumber(fps, 0)}</strong>
             <span>Approx. FPS</span>
           </article>
@@ -28,13 +37,29 @@ function Stats() {
             <strong>{sampleCount}</strong>
             <span>Spline Samples</span>
           </article>
+          <article className="stats-chip">
+            <strong>
+              {viewMode === 'freeCamera'
+                ? 'Free'
+                : viewMode === 'thirdPerson'
+                  ? 'Follow'
+                  : 'Seat'}
+            </strong>
+            <span>Camera Mode</span>
+          </article>
         </div>
 
         <div className="track-summary">
           <strong>Performance Notes</strong>
           <span>
-            BufferGeometry tubes, instanced support pillars, and throttled HUD
-            updates help keep the scene responsive at desktop resolutions.
+            Realistic dual rails, carved terrain clearance, and the detached
+            free camera all share the same scene loop while the train continues
+            to ride the closed spline.
+          </span>
+          <span>
+            {metrics.loopReady
+              ? 'Loop continuity validated for seamless cycling.'
+              : 'Loop continuity needs attention at the seam.'}
           </span>
         </div>
       </div>

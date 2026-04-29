@@ -1,124 +1,183 @@
 import * as THREE from 'three';
-import { TRACK_RADIUS, TRACK_TIE_SPACING } from '../utils/Constants';
-import { createTrackGeometry } from '../utils/TrackGenerator';
+import { TRACK_TIE_SPACING } from '../utils/Constants';
 
 const helperMatrix = new THREE.Matrix4();
 const helperPosition = new THREE.Vector3();
+
+const MAIN_RAIL_SPACING = 1.46;
+const MAIN_RAIL_HEIGHT = 0.42;
+const MAIN_RAIL_RADIUS = 0.11;
+const GUARD_RAIL_OFFSET = 1.18;
+const GUARD_RAIL_HEIGHT = 0.14;
+const GUARD_RAIL_RADIUS = 0.045;
+
+function createOffsetCurve(trackData, lateralOffset, verticalOffset = 0) {
+  const points = trackData.samples.slice(0, -1).map((sample) =>
+    sample.point
+      .clone()
+      .addScaledVector(sample.right, lateralOffset)
+      .addScaledVector(sample.up, verticalOffset)
+  );
+
+  return new THREE.CatmullRomCurve3(points, trackData.closed, 'centripetal', 0.35);
+}
+
+function createRailMesh(curve, radius, color, roughness, metalness, tubularSegments) {
+  const geometry = new THREE.TubeGeometry(
+    curve,
+    tubularSegments,
+    radius,
+    10,
+    true
+  );
+
+  const material = new THREE.MeshStandardMaterial({
+    color,
+    roughness,
+    metalness,
+    polygonOffset: true,
+    polygonOffsetFactor: 1,
+    polygonOffsetUnits: 1
+  });
+
+  const mesh = new THREE.Mesh(geometry, material);
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+
+  return mesh;
+}
 
 export function createRollerCoasterTrack(trackData, trackConfig) {
   const group = new THREE.Group();
   group.name = `${trackConfig.name} Track`;
 
-  const spineGeometry = createTrackGeometry(trackData.curve, {
-    radius: TRACK_RADIUS,
-    tubularSegments: trackData.sampleCount
-  });
+  const leftRailCurve = createOffsetCurve(
+    trackData,
+    -MAIN_RAIL_SPACING / 2,
+    MAIN_RAIL_HEIGHT
+  );
+  const rightRailCurve = createOffsetCurve(
+    trackData,
+    MAIN_RAIL_SPACING / 2,
+    MAIN_RAIL_HEIGHT
+  );
+  const leftGuardCurve = createOffsetCurve(
+    trackData,
+    -GUARD_RAIL_OFFSET,
+    GUARD_RAIL_HEIGHT
+  );
+  const rightGuardCurve = createOffsetCurve(
+    trackData,
+    GUARD_RAIL_OFFSET,
+    GUARD_RAIL_HEIGHT
+  );
+  const centerSpineCurve = createOffsetCurve(trackData, 0, 0.1);
 
-  const spineMaterial = new THREE.MeshStandardMaterial({
-    color: trackConfig.color,
-    roughness: 0.36,
-    metalness: 0.78,
-    envMapIntensity: 1.1
-  });
-
-  const spineMesh = new THREE.Mesh(spineGeometry, spineMaterial);
-  spineMesh.castShadow = true;
-  spineMesh.receiveShadow = true;
-
-  const coreGeometry = createTrackGeometry(trackData.curve, {
-    radius: TRACK_RADIUS * 0.34,
-    tubularSegments: trackData.sampleCount
-  });
-
-  const coreMaterial = new THREE.MeshStandardMaterial({
-    color: '#f5f7fb',
-    roughness: 0.24,
-    metalness: 1
-  });
-
-  const coreMesh = new THREE.Mesh(coreGeometry, coreMaterial);
-  coreMesh.castShadow = true;
-  coreMesh.receiveShadow = true;
-
-  const accentGeometry = new THREE.BufferGeometry().setFromPoints(trackData.points);
-  const accentMaterial = new THREE.LineBasicMaterial({
-    color: '#fefefe',
-    transparent: true,
-    opacity: 0.65
-  });
-  const accentLine = new THREE.Line(accentGeometry, accentMaterial);
+  const leftRail = createRailMesh(
+    leftRailCurve,
+    MAIN_RAIL_RADIUS,
+    '#1b212c',
+    0.24,
+    0.86,
+    trackData.sampleCount
+  );
+  const rightRail = createRailMesh(
+    rightRailCurve,
+    MAIN_RAIL_RADIUS,
+    '#1b212c',
+    0.24,
+    0.86,
+    trackData.sampleCount
+  );
+  const leftGuardRail = createRailMesh(
+    leftGuardCurve,
+    GUARD_RAIL_RADIUS,
+    '#2f3844',
+    0.48,
+    0.52,
+    Math.floor(trackData.sampleCount * 0.7)
+  );
+  const rightGuardRail = createRailMesh(
+    rightGuardCurve,
+    GUARD_RAIL_RADIUS,
+    '#2f3844',
+    0.48,
+    0.52,
+    Math.floor(trackData.sampleCount * 0.7)
+  );
+  const centerSpine = createRailMesh(
+    centerSpineCurve,
+    0.085,
+    trackConfig.color,
+    0.36,
+    0.68,
+    Math.floor(trackData.sampleCount * 0.78)
+  );
 
   const tieCount = Math.max(Math.floor(trackData.sampleCount / TRACK_TIE_SPACING), 1);
-  const tieGeometry = new THREE.BoxGeometry(2.6, 0.16, 0.42);
+  const tieGeometry = new THREE.BoxGeometry(0.22, 0.12, MAIN_RAIL_SPACING + 0.62);
   const tieMaterial = new THREE.MeshStandardMaterial({
-    color: '#2e3744',
-    roughness: 0.88,
-    metalness: 0.16
+    color: '#4a4f57',
+    roughness: 0.9,
+    metalness: 0.18,
+    polygonOffset: true,
+    polygonOffsetFactor: 1,
+    polygonOffsetUnits: 1
   });
   const ties = new THREE.InstancedMesh(tieGeometry, tieMaterial, tieCount);
   ties.castShadow = true;
   ties.receiveShadow = true;
 
+  const clampGeometry = new THREE.BoxGeometry(0.12, 0.08, 0.2);
+  const clampMaterial = new THREE.MeshStandardMaterial({
+    color: '#dce4ec',
+    roughness: 0.42,
+    metalness: 0.88
+  });
+  const clamps = new THREE.InstancedMesh(clampGeometry, clampMaterial, tieCount * 2);
+  clamps.castShadow = true;
+  clamps.receiveShadow = true;
+
   for (let index = 0; index < tieCount; index += 1) {
     const sample = trackData.samples[index * TRACK_TIE_SPACING];
-    const basisX = sample.binormal.clone().normalize();
-    const basisY = sample.normal.clone().normalize();
-    const basisZ = sample.tangent.clone().normalize();
+    const basisX = sample.tangent.clone().normalize();
+    const basisY = sample.up.clone().normalize();
+    const basisZ = sample.right.clone().normalize();
 
     helperMatrix.makeBasis(basisX, basisY, basisZ);
-    helperPosition.copy(sample.point).addScaledVector(basisY, -0.05);
+    helperPosition.copy(sample.point).addScaledVector(sample.up, 0.18);
     helperMatrix.setPosition(helperPosition);
     ties.setMatrixAt(index, helperMatrix);
+
+    const leftClampPosition = sample.point
+      .clone()
+      .addScaledVector(sample.up, MAIN_RAIL_HEIGHT - 0.04)
+      .addScaledVector(sample.right, -MAIN_RAIL_SPACING / 2);
+    helperMatrix.makeBasis(basisX, basisY, basisZ);
+    helperMatrix.setPosition(leftClampPosition);
+    clamps.setMatrixAt(index * 2, helperMatrix);
+
+    const rightClampPosition = sample.point
+      .clone()
+      .addScaledVector(sample.up, MAIN_RAIL_HEIGHT - 0.04)
+      .addScaledVector(sample.right, MAIN_RAIL_SPACING / 2);
+    helperMatrix.makeBasis(basisX, basisY, basisZ);
+    helperMatrix.setPosition(rightClampPosition);
+    clamps.setMatrixAt(index * 2 + 1, helperMatrix);
   }
 
   ties.instanceMatrix.needsUpdate = true;
+  clamps.instanceMatrix.needsUpdate = true;
 
-  group.add(spineMesh, coreMesh, accentLine, ties);
+  group.add(
+    leftRail,
+    rightRail,
+    leftGuardRail,
+    rightGuardRail,
+    centerSpine,
+    ties,
+    clamps
+  );
 
   return group;
-}
-
-export function createCartMesh(color) {
-  const cart = new THREE.Group();
-  cart.name = 'Camera Cart';
-
-  const base = new THREE.Mesh(
-    new THREE.BoxGeometry(1.6, 0.7, 2.2),
-    new THREE.MeshStandardMaterial({
-      color,
-      roughness: 0.34,
-      metalness: 0.66
-    })
-  );
-  base.castShadow = true;
-  base.receiveShadow = true;
-
-  const cockpit = new THREE.Mesh(
-    new THREE.BoxGeometry(1.1, 0.55, 1.2),
-    new THREE.MeshStandardMaterial({
-      color: '#f7fbff',
-      roughness: 0.2,
-      metalness: 0.88
-    })
-  );
-  cockpit.position.set(0, 0.52, 0.1);
-  cockpit.castShadow = true;
-  cockpit.receiveShadow = true;
-
-  const nose = new THREE.Mesh(
-    new THREE.ConeGeometry(0.55, 0.95, 16),
-    new THREE.MeshStandardMaterial({
-      color: '#1f2a38',
-      roughness: 0.48,
-      metalness: 0.52
-    })
-  );
-  nose.rotation.x = Math.PI / 2;
-  nose.position.set(0, 0.08, 1.5);
-  nose.castShadow = true;
-  nose.receiveShadow = true;
-
-  cart.add(base, cockpit, nose);
-
-  return cart;
 }
