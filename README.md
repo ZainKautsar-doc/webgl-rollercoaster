@@ -17,7 +17,7 @@ Aplikasi ini menampilkan lintasan coaster tertutup berbasis spline, pergerakan k
   - **First Person**: Rasakan sensasi duduk di kursi depan kereta.
   - **Third Person**: Lihat pergerakan kereta dari sudut pandang eksternal.
   - **Free Camera**: Jelajahi seluruh lingkungan secara bebas menggunakan keyboard dan mouse.
-- **HUD Interaktif & Telemetri**: Monitor data simulasi secara real-time termasuk FPS, ketinggian, gradien, dan progres lintasan.
+- **HUD Interaktif & Telemetri**: Monitor data simulasi secara real-time termasuk FPS, ketinggian, gradien, dan progres lintasan. Dilengkapi juga dengan tombol **Toggle UI** untuk menyembunyikan antarmuka dan menikmati pemandangan 3D secara penuh.
 - **Visual Berkualitas Tinggi**: Struktur lintasan yang detail (rails, sleepers, ties, supports) dan lingkungan terrain yang diukir secara prosedural.
 
 ## 🚀 Teknologi yang Digunakan
@@ -41,6 +41,7 @@ Aplikasi ini menampilkan lintasan coaster tertutup berbasis spline, pergerakan k
 - **Play/Pause**: Memulai atau menghentikan simulasi.
 - **Reset**: Mengulang simulasi dari awal atau merestart scene.
 - **Switch Track**: Mengganti lintasan secara instan melalui panel kontrol.
+- **Toggle UI (Hide/Show UI)**: Menyembunyikan seluruh elemen antarmuka untuk memberikan pandangan yang bersih (*clean view*).
 
 ## 🛠️ Instalasi & Penggunaan
 
