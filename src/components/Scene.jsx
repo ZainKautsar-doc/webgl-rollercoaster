@@ -104,7 +104,7 @@ function Scene({ mountRef }) {
 
     physicsEngine.setSpeedLimitKmh(useSimulationStore.getState().speedLimitKmh);
     const initialSnapshot = physicsEngine.getSnapshot();
-    cameraController.updatePosition(initialSnapshot.distance, train);
+    cameraController.updatePosition(initialSnapshot.distance, train, initialSnapshot);
 
     if (useSimulationStore.getState().viewMode === 'freeCamera') {
       freeCameraController.reset();
@@ -166,14 +166,14 @@ function Scene({ mountRef }) {
           freeCameraController.enable();
         }
 
-        cameraController.updateTrainPosition(currentSnapshot.distance, train);
+        cameraController.updateTrainPosition(currentSnapshot.distance, train, currentSnapshot);
         freeCameraController.update(deltaTime);
       } else {
         if (freeCameraController.enabled) {
           freeCameraController.disable();
         }
 
-        cameraController.updatePosition(currentSnapshot.distance, train);
+        cameraController.updatePosition(currentSnapshot.distance, train, currentSnapshot);
       }
 
       smoothedFps =

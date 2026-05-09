@@ -55,28 +55,32 @@ class CameraController {
     );
   }
 
-  updateTrainPosition(distanceAlongTrack, trainComposition) {
+  updateTrainPosition(distanceAlongTrack, trainComposition, dynamics = {}) {
     if (!trainComposition) {
       return [];
     }
 
     const trainSamples = this.getTrainSamples(distanceAlongTrack);
-    trainComposition.updateFromSamples(trainSamples);
+    trainComposition.updateFromSamples(trainSamples, dynamics);
     return trainSamples;
   }
 
-  updatePosition(distanceAlongTrack, trainComposition) {
+  updatePosition(distanceAlongTrack, trainComposition, dynamics = {}) {
     const sample = getTrackSampleAtDistance(this.trackData, distanceAlongTrack);
     const lookAhead = getTrackSampleAtDistance(
       this.trackData,
       distanceAlongTrack + this.lookAheadDistance
     );
-    const trainSamples = this.updateTrainPosition(distanceAlongTrack, trainComposition);
+    const trainSamples = this.updateTrainPosition(
+      distanceAlongTrack,
+      trainComposition,
+      dynamics
+    );
 
     const pose =
       this.viewMode === 'thirdPerson'
         ? this.getThirdPersonPose(sample, lookAhead)
-        : this.getFirstPersonPose(sample, lookAhead);
+        : this.getFirstPersonPose(sample, lookAhead, dynamics);
 
     if (!this.initialized) {
       this.smoothedPosition.copy(pose.position);
@@ -104,16 +108,30 @@ class CameraController {
     };
   }
 
-  getFirstPersonPose(sample, lookAhead) {
+  getFirstPersonPose(sample, lookAhead, dynamics = {}) {
+    const speedFactor = THREE.MathUtils.clamp((dynamics.speedMs ?? 0) / 42, 0, 1);
+    const forceFactor = THREE.MathUtils.clamp(((dynamics.gForce ?? 1) - 1) / 3.5, 0, 1);
+    const shakePhase = (dynamics.elapsedTime ?? 0) * (10 + speedFactor * 26);
+    const shakeStrength = 0.015 + speedFactor * 0.055 + forceFactor * 0.035;
+    const lateralShake = Math.sin(shakePhase * 1.7) * shakeStrength;
+    const verticalShake = Math.cos(shakePhase * 2.3) * shakeStrength * 0.65;
+
     const cameraPosition = sample.point
       .clone()
       .addScaledVector(sample.up, 1.42)
-      .addScaledVector(sample.tangent, -0.12);
+      .addScaledVector(sample.tangent, -0.12)
+      .addScaledVector(sample.right, lateralShake)
+      .addScaledVector(sample.up, verticalShake);
     const target = lookAhead.point
       .clone()
       .addScaledVector(lookAhead.up, 1.16)
-      .addScaledVector(lookAhead.tangent, 5.6);
-    const up = sample.up.clone().lerp(worldUp, 0.08).normalize();
+      .addScaledVector(lookAhead.tangent, 5.6)
+      .addScaledVector(sample.right, lateralShake * 0.45);
+    const up = sample.up
+      .clone()
+      .addScaledVector(sample.right, Math.sin(shakePhase * 0.72) * forceFactor * 0.04)
+      .lerp(worldUp, 0.08)
+      .normalize();
 
     return {
       position: cameraPosition,

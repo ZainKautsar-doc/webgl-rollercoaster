@@ -10,6 +10,7 @@ const MAIN_RAIL_RADIUS = 0.11;
 const GUARD_RAIL_OFFSET = 1.18;
 const GUARD_RAIL_HEIGHT = 0.14;
 const GUARD_RAIL_RADIUS = 0.045;
+const WALKWAY_OFFSET = 1.42;
 
 function createOffsetCurve(trackData, lateralOffset, verticalOffset = 0) {
   const points = trackData.samples.slice(0, -1).map((sample) =>
@@ -138,6 +139,58 @@ export function createRollerCoasterTrack(trackData, trackConfig) {
   clamps.castShadow = true;
   clamps.receiveShadow = true;
 
+  const crossbeamGeometry = new THREE.BoxGeometry(0.16, 0.16, MAIN_RAIL_SPACING + 0.26);
+  const crossbeamMaterial = new THREE.MeshStandardMaterial({
+    color: '#222b36',
+    roughness: 0.64,
+    metalness: 0.62
+  });
+  const crossbeams = new THREE.InstancedMesh(
+    crossbeamGeometry,
+    crossbeamMaterial,
+    tieCount
+  );
+  crossbeams.castShadow = true;
+  crossbeams.receiveShadow = true;
+
+  const spineBracketGeometry = new THREE.BoxGeometry(0.14, MAIN_RAIL_HEIGHT, 0.12);
+  const spineBracketMaterial = new THREE.MeshStandardMaterial({
+    color: '#f0f4f8',
+    roughness: 0.46,
+    metalness: 0.82
+  });
+  const spineBrackets = new THREE.InstancedMesh(
+    spineBracketGeometry,
+    spineBracketMaterial,
+    tieCount * 2
+  );
+  spineBrackets.castShadow = true;
+  spineBrackets.receiveShadow = true;
+
+  const walkwayGeometry = new THREE.BoxGeometry(0.34, 0.045, 0.5);
+  const walkwayMaterial = new THREE.MeshStandardMaterial({
+    color: '#596472',
+    roughness: 0.88,
+    metalness: 0.34
+  });
+  const walkways = new THREE.InstancedMesh(walkwayGeometry, walkwayMaterial, tieCount);
+  walkways.castShadow = true;
+  walkways.receiveShadow = true;
+
+  const handrailPostGeometry = new THREE.BoxGeometry(0.055, 0.46, 0.055);
+  const handrailPostMaterial = new THREE.MeshStandardMaterial({
+    color: '#d6dee8',
+    roughness: 0.48,
+    metalness: 0.82
+  });
+  const handrailPosts = new THREE.InstancedMesh(
+    handrailPostGeometry,
+    handrailPostMaterial,
+    tieCount
+  );
+  handrailPosts.castShadow = true;
+  handrailPosts.receiveShadow = true;
+
   for (let index = 0; index < tieCount; index += 1) {
     const sample = trackData.samples[index * TRACK_TIE_SPACING];
     const basisX = sample.tangent.clone().normalize();
@@ -148,6 +201,43 @@ export function createRollerCoasterTrack(trackData, trackConfig) {
     helperPosition.copy(sample.point).addScaledVector(sample.up, 0.18);
     helperMatrix.setPosition(helperPosition);
     ties.setMatrixAt(index, helperMatrix);
+
+    helperMatrix.makeBasis(basisX, basisY, basisZ);
+    helperPosition.copy(sample.point).addScaledVector(sample.up, MAIN_RAIL_HEIGHT - 0.16);
+    helperMatrix.setPosition(helperPosition);
+    crossbeams.setMatrixAt(index, helperMatrix);
+
+    helperMatrix.makeBasis(basisX, basisY, basisZ);
+    helperPosition
+      .copy(sample.point)
+      .addScaledVector(sample.up, MAIN_RAIL_HEIGHT * 0.5)
+      .addScaledVector(sample.right, -MAIN_RAIL_SPACING / 2);
+    helperMatrix.setPosition(helperPosition);
+    spineBrackets.setMatrixAt(index * 2, helperMatrix);
+
+    helperMatrix.makeBasis(basisX, basisY, basisZ);
+    helperPosition
+      .copy(sample.point)
+      .addScaledVector(sample.up, MAIN_RAIL_HEIGHT * 0.5)
+      .addScaledVector(sample.right, MAIN_RAIL_SPACING / 2);
+    helperMatrix.setPosition(helperPosition);
+    spineBrackets.setMatrixAt(index * 2 + 1, helperMatrix);
+
+    helperMatrix.makeBasis(basisX, basisY, basisZ);
+    helperPosition
+      .copy(sample.point)
+      .addScaledVector(sample.up, MAIN_RAIL_HEIGHT - 0.18)
+      .addScaledVector(sample.right, WALKWAY_OFFSET);
+    helperMatrix.setPosition(helperPosition);
+    walkways.setMatrixAt(index, helperMatrix);
+
+    helperMatrix.makeBasis(basisX, basisY, basisZ);
+    helperPosition
+      .copy(sample.point)
+      .addScaledVector(sample.up, MAIN_RAIL_HEIGHT + 0.08)
+      .addScaledVector(sample.right, WALKWAY_OFFSET + 0.24);
+    helperMatrix.setPosition(helperPosition);
+    handrailPosts.setMatrixAt(index, helperMatrix);
 
     const leftClampPosition = sample.point
       .clone()
@@ -168,6 +258,10 @@ export function createRollerCoasterTrack(trackData, trackConfig) {
 
   ties.instanceMatrix.needsUpdate = true;
   clamps.instanceMatrix.needsUpdate = true;
+  crossbeams.instanceMatrix.needsUpdate = true;
+  spineBrackets.instanceMatrix.needsUpdate = true;
+  walkways.instanceMatrix.needsUpdate = true;
+  handrailPosts.instanceMatrix.needsUpdate = true;
 
   group.add(
     leftRail,
@@ -176,7 +270,11 @@ export function createRollerCoasterTrack(trackData, trackConfig) {
     rightGuardRail,
     centerSpine,
     ties,
-    clamps
+    clamps,
+    crossbeams,
+    spineBrackets,
+    walkways,
+    handrailPosts
   );
 
   return group;

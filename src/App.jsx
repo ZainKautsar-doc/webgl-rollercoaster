@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { gsap } from 'gsap';
 import Canvas from './components/Canvas';
 import Controls from './components/UI/Controls';
@@ -6,6 +6,7 @@ import InfoPanel from './components/UI/InfoPanel';
 import Stats from './components/UI/Stats';
 
 function App() {
+  const [showUI, setShowUI] = useState(true);
   useEffect(() => {
     const ctx = gsap.context(() => {
       gsap.fromTo(
@@ -35,7 +36,15 @@ function App() {
         <Canvas />
       </section>
 
-      <div className="hud-overlays">
+      <button 
+        className="toggle-ui-btn" 
+        onClick={() => setShowUI(!showUI)}
+        title="Toggle UI"
+      >
+        {showUI ? 'Hide UI' : 'Show UI'}
+      </button>
+
+      <div className={`hud-overlays ${showUI ? '' : 'hidden'}`}>
         <div className="hud-left">
           <header className="title-block">
             <div className="title-row">
