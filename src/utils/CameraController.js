@@ -89,9 +89,9 @@ class CameraController {
       this.smoothedUp.copy(pose.up);
       this.initialized = true;
     } else {
-      const positionAlpha = this.viewMode === 'thirdPerson' ? 0.12 : 0.18;
-      const targetAlpha = this.viewMode === 'thirdPerson' ? 0.14 : 0.22;
-      const upAlpha = this.viewMode === 'thirdPerson' ? 0.14 : 0.18;
+      const positionAlpha = this.viewMode === 'thirdPerson' ? 0.15 : 1.0;
+      const targetAlpha = this.viewMode === 'thirdPerson' ? 0.18 : 1.0;
+      const upAlpha = this.viewMode === 'thirdPerson' ? 0.18 : 1.0;
 
       this.smoothedPosition.lerp(pose.position, positionAlpha);
       this.smoothedTarget.lerp(pose.target, targetAlpha);
@@ -116,8 +116,8 @@ class CameraController {
   getFirstPersonPose(sample, lookAhead, dynamics = {}) {
     const speedFactor = THREE.MathUtils.clamp((dynamics.speedMs ?? 0) / 42, 0, 1);
     const forceFactor = THREE.MathUtils.clamp(((dynamics.gForce ?? 1) - 1) / 3.5, 0, 1);
-    const shakePhase = (dynamics.elapsedTime ?? 0) * (10 + speedFactor * 26);
-    const shakeStrength = 0.015 + speedFactor * 0.055 + forceFactor * 0.035;
+    const shakePhase = (dynamics.elapsedTime ?? 0) * (8 + speedFactor * 12);
+    const shakeStrength = (speedFactor * 0.01) + (forceFactor * 0.01);
     const lateralShake = Math.sin(shakePhase * 1.7) * shakeStrength;
     const verticalShake = Math.cos(shakePhase * 2.3) * shakeStrength * 0.65;
 
@@ -133,7 +133,6 @@ class CameraController {
       .addScaledVector(sample.right, lateralShake * 0.45);
     const up = sample.up
       .clone()
-      .addScaledVector(sample.right, Math.sin(shakePhase * 0.72) * forceFactor * 0.04)
       .lerp(worldUp, 0.08)
       .normalize();
 
