@@ -67,9 +67,10 @@ class CameraController {
 
   updatePosition(distanceAlongTrack, trainComposition, dynamics = {}) {
     const sample = getTrackSampleAtDistance(this.trackData, distanceAlongTrack);
+    const activeLookAhead = this.viewMode === 'firstPerson' ? 4.0 : this.lookAheadDistance;
     const lookAhead = getTrackSampleAtDistance(
       this.trackData,
-      distanceAlongTrack + this.lookAheadDistance
+      distanceAlongTrack + activeLookAhead
     );
     const trainSamples = this.updateTrainPosition(
       distanceAlongTrack,
@@ -101,6 +102,10 @@ class CameraController {
     this.camera.up.copy(this.smoothedUp);
     this.camera.lookAt(this.smoothedTarget);
 
+    if (trainComposition && trainComposition.cars.length > 0) {
+      trainComposition.cars[0].getMesh().visible = this.viewMode !== 'firstPerson';
+    }
+
     return {
       sample,
       lookAhead,
@@ -118,14 +123,13 @@ class CameraController {
 
     const cameraPosition = sample.point
       .clone()
-      .addScaledVector(sample.up, 1.42)
-      .addScaledVector(sample.tangent, -0.12)
+      .addScaledVector(sample.up, 1.4)
+      .addScaledVector(sample.tangent, 2.0)
       .addScaledVector(sample.right, lateralShake)
       .addScaledVector(sample.up, verticalShake);
     const target = lookAhead.point
       .clone()
-      .addScaledVector(lookAhead.up, 1.16)
-      .addScaledVector(lookAhead.tangent, 5.6)
+      .addScaledVector(lookAhead.up, 1.2)
       .addScaledVector(sample.right, lateralShake * 0.45);
     const up = sample.up
       .clone()

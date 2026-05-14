@@ -59,14 +59,14 @@ class PhysicsEngine {
 
     let boosterAcceleration = 0;
 
-    if (trackGradient > 0.16 && speedMs < this.minimumSpeedMs + 6) {
+    if (trackGradient > 0.05 && speedMs < this.minimumSpeedMs + 10) {
       boosterAcceleration =
-        this.boosterStrength * (1 + Math.max(trackGradient - 0.16, 0) * 1.8);
+        this.boosterStrength * 2.5 * (1 + trackGradient * 2);
     }
 
     const totalAcceleration =
       slopeAcceleration + momentumAssist + boosterAcceleration - frictionAcceleration;
-    const climbingFloor = trackGradient > 0.12 ? this.minimumSpeedMs : 0;
+    const climbingFloor = trackGradient > 0.02 ? this.minimumSpeedMs : 0;
     const nextSpeed = clamp(
       speedMs + totalAcceleration * deltaTime,
       climbingFloor,

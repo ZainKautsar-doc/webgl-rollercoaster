@@ -86,6 +86,7 @@ class TrainComposition {
         MAX_BANK_ANGLE
       );
       carMesh.rotateZ(-bankAngle * turnDirection);
+      carMesh.rotateY(Math.PI); // Rotate 180 degrees so the nose (+z) faces forward
 
       car.animate({
         ...dynamics,
